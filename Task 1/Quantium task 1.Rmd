@@ -1,0 +1,726 @@
+---
+title: "Quantium Task 1"
+author: "Harish Venkatesh"
+date: "8/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+pacman::p_load(data.table, ggplot2, tidyverse)
+theme_set(theme_classic())
+```
+
+```{r}
+#upload CSV files 
+
+transactionData <- fread("QVI_transaction_data.csv")
+customerData <- fread("QVI_purchase_behaviour.csv")
+
+```
+
+```{r}
+str(transactionData)
+
+str(customerData)
+```
+
+```{r}
+#### Convert DATE column to a date format
+#### A quick search online tells us that CSV and Excel integer dates begin on 30 Dec 1899
+
+transactionData$DATE <- as.Date(transactionData$DATE, origin = "1899-12-30")
+
+```
+
+```{r}
+str(transactionData)
+```
+
+```{r}
+summary(transactionData)
+summary(transactionData$PROD_NAME)
+
+```
+```{r}
+unique(transactionData$PROD_NAME)
+
+```
+
+# We can see a total of 114 chips variety
+```{r}
+# checking to see if the 114 products are really Chips
+
+productWords <- data.table(unlist(strsplit(unique(transactionData[, PROD_NAME]), " ")))
+setnames(productWords, 'words')
+
+```
+
+```{r}
+transactionData[, SALSA := grepl("salsa", tolower(PROD_NAME))]
+transactionData <- transactionData[SALSA == FALSE, ][, SALSA := NULL]
+
+
+```
+
+```{r}
+
+summary(transactionData)
+```
+
+```{r}
+sum(is.na(transactionData$PROD_NAME))
+sum(is.na(transactionData))
+```
+# table has no null values 
+
+```{r}
+
+# max Product Quantity is 200, seems like an outlier
+
+subset(transactionData, (PROD_QTY == 200))
+```
+```{r}
+subset(transactionData, (PROD_QTY > 100))
+```
+
+# seems like there are 2 outliers, both with the same loyalty card number 226000
+
+```{r}
+subset(transactionData, (LYLTY_CARD_NBR == 226000))
+```
+```{r}
+#looking at Customer Data for the same loyalty card, 226000
+subset(customerData, (LYLTY_CARD_NBR == 226000))
+```
+# this customer is a PREMIUM Customer
+
+```{r}
+unique(customerData$LIFESTAGE)
+unique(customerData$PREMIUM_CUSTOMER)
+```
+
+```{r}
+# removing this customer transactions
+
+transactionData <- subset(transactionData, LYLTY_CARD_NBR!= 226000)
+
+```
+
+```{r}
+subset(transactionData, (LYLTY_CARD_NBR == 226000))
+```
+# successfully removed the transaction, which seemed as outlier
+
+```{r}
+unique(transactionData$DATE)
+```
+```{r}
+summary(transactionData$DATE)
+```
+
+```{r}
+library(lubridate)
+
+dates <- seq(ymd("2018-07-01"), ymd("2019-06-30"), by = "1 day")
+```
+```{r}
+dates
+```
+
+```{r}
+uniqueDates <- unique(transactionData$DATE)
+```
+
+```{r}
+dates[!dates %in% uniqueDates] 
+```
+
+```{r}
+trans_by_date <- aggregate(transactionData$PROD_QTY, by=list(transactionData$DATE), sum)
+trans_by_date
+```
+
+
+```{r}
+#### Setting plot themes to format graphs
+theme_set(theme_bw())
+theme_update(plot.title = element_text(hjust = 0.5))
+```
+ 
+```{r}
+#### Plot transactions over time
+ggplot(trans_by_date, aes(x = Group.1, y = x)) +
+ geom_line() +
+ labs(x = "Date", y = "Number of transactions", title = "Transactions over time") +
+ scale_x_date(breaks = "1 month", date_labels =  "%b %Y") +
+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+
+# we can see that sales dropped in August and May
+# Also sales raised very high in December
+
+
+```{r}
+# using scale_x_date to limit the time frame
+
+ggplot(trans_by_date, aes(x = Group.1, y = x)) +
+ geom_line() +
+ labs(x = "Date", y = "Number of transactions", title = "Transactions over time") +
+ scale_x_date(breaks = "1 week") +
+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+scale_x_date(limit=c(as.Date("2018-12-01"),as.Date("2019-01-01"))) 
+```
+
+# sales around Christmas seems to be very high!!!
+
+# satisfied that data no longer contains outliers
+
+```{r}
+
+# work on pack size, take out the digits from the PROD_NAME
+# add PACK_SIZE to transactionData with numbers from PROD)NAME
+
+transactionData[, PACK_SIZE := parse_number(PROD_NAME)]
+
+
+```
+
+
+```{r}
+
+# added PACK_SIZE to transactionData with numbers from PROD)NAME
+
+colnames(transactionData)
+```
+
+```{r}
+sort(unique(transactionData$PACK_SIZE))
+```
+
+# Pack siczes vary from 70g to 380g
+
+```{r}
+str(transactionData$PACK_SIZE)
+
+```
+
+```{r}
+
+transaction_by_size <- aggregate(transactionData$PROD_QTY, by=list(transactionData$PACK_SIZE), sum)
+
+transaction_by_size
+```
+
+```{r}
+ggplot(transaction_by_size, aes(transaction_by_size$Group.1)) +
+  geom_histogram( binwidth = 5, col = "blue", fill = "green", alpha = 0.2) +
+  ggtitle("Transaction by Pack size")
+
+```
+
+
+
+```{r Create Brand Name}
+
+library(stringr)
+
+transactionData$BRAND_NAME <- word(transactionData$PROD_NAME, 1)
+```
+
+```{r}
+head(transactionData$BRAND_NAME, 50)
+```
+
+```{r}
+unique(transactionData$BRAND_NAME)
+```
+
+```{r}
+#### Clean brand names
+
+transactionData[BRAND_NAME == "RED", BRAND_NAME := "RRD"]
+
+```
+
+```{r}
+
+unique(transactionData$BRAND_NAME)
+
+```
+
+```{r}
+# Examining Customer data
+
+str(customerData)
+```
+
+```{r}
+summary(customerData)
+```
+
+```{r}
+unique(customerData$LIFESTAGE)
+print("******")
+unique(customerData$PREMIUM_CUSTOMER)
+```
+
+```{r}
+ggplot(customerData, aes(LIFESTAGE) ) + geom_bar(fill = "lightblue") +
+  geom_text(stat='count', aes(label=..count..)) +
+  coord_flip()
+```
+
+```{r}
+ggplot(customerData, aes(PREMIUM_CUSTOMER)) + geom_bar(fill = "pink") +
+  geom_text(stat='count', aes(label=..count..)) +
+  coord_flip()
+```
+
+```{r}
+
+#### Merge transaction data to customer data
+data <- merge(transactionData, customerData, all.x = TRUE)
+
+# Gives us transactions along with customer details (left join)
+
+```
+
+```{r}
+data
+```
+
+```{r}
+str(data)
+```
+"""
+# note:
+
+As the number of rows in `data` is the same as that of `transactionData`, we can be
+sure that no duplicates were created. This is because we created `data` by setting
+#`all.x = TRUE` (in other words, a left join) 
+which means take all the rows in
+transactionData` and find rows with matching values in shared columns and then
+joining the details in these rows to the `x` or the first mentioned table.
+
+"""
+```{r}
+#check if some customers were not matched on by checking for nulls
+
+sum(is.na(data))
+
+```
+# No null values in data
+
+```{r}
+
+```
+
+#Note that if you are continuing with Task 2, you may want to retain this dataset (data)
+
+```{r Code to save dataset as a csv}
+fwrite(data, paste0("QVI_data.csv"))
+```
+
+"""
+- Who spends the most on chips (total sales), describing customers by lifestage and
+how premium their general purchasing behaviour is
+- How many customers are in each segment
+- How many chips are bought per customer by segment
+- What's the average chip price by customer segment
+
+"""
+```{r}
+
+ #calculating total sales by LIFESTAGE and PREMIUM_CUSTOMER
+
+sales_by_LS <- aggregate(data$TOT_SALES, by=list(data$LIFESTAGE), sum)
+sales_by_PC <- aggregate(data$TOT_SALES, by=list(data$PREMIUM_CUSTOMER), sum)
+```
+
+```{r}
+sales_by_LS
+```
+
+```{r}
+ggplot(sales_by_LS) + 
+  geom_bar(aes(x = Group.1, y = x), stat = "identity", width =.4, fill="darkseagreen2") +
+  coord_flip() + geom_text(aes(x = Group.1, y = x, label = x))
+  ylab("Life Stage") + xlab("sales") + 
+  ggtitle("Sales by LifeStyle")
+```
+
+
+```{r}
+sales_by_PC
+```
+
+```{r}
+ggplot(sales_by_PC) + 
+  geom_bar(aes(x = Group.1, y = x), stat = "identity", width =.4, fill="darkolivegreen2") +
+  coord_flip() + geom_text(aes(x = Group.1, y = x, label = x))
+  ylab("Life Stage") + xlab("sales") + 
+  ggtitle("Sales by PremiunCustomer")
+```
+
+```{r}
+colnames(data)
+```
+
+```{r}
+
+sales_by_PC_LS <- data[, c(12,11,8)]
+sales_by_PC_LS$PC_LS = paste(sales_by_PC_LS$PREMIUM_CUSTOMER, sales_by_PC_LS$LIFESTAGE)
+sales_by_PC_LS
+```
+
+```{r}
+PC_LS <- aggregate(sales_by_PC_LS$TOT_SALES, by=list(sales_by_PC_LS$PC_LS), sum)
+PC_LS #total sales by PC_LS
+```
+
+```{r}
+
+PC_LS <- PC_LS[order(PC_LS$x), ]
+PC_LS
+```
+
+
+```{r}
+ggplot(PC_LS) + 
+  geom_bar(aes(x = Group.1, y = x), stat = "identity", width =.4, fill="darkolivegreen2") +
+  coord_flip() + geom_text(aes(x = Group.1, y = x, label = x))
+  ylab("PC-LS") + xlab("sales") + scale_x_discrete(limits = Group.1) +
+  ggtitle("Sales by PremiumCustomer and LifeStyle")
+```
+# Sales by PremiumCustomer and LifeStyle
+"""
+
+Sales are coming mainly from Budget - older families, Mainstream - young
+singles/couples, and Mainstream - retirees
+
+# we looked at sales, now find customer segments for high sales and reason
+"""
+
+
+
+# is sales driven by number of members in a segment?????
+```{r}
+# is sales driven by number of members in a segment?????
+#looking at count
+
+ggplot(sales_by_PC_LS, aes(PC_LS)) + geom_bar(fill = "pink") +
+  geom_text(stat='count', aes(label=..count..)) +
+  coord_flip()
+
+```
+
+"""
+Higher sales may also be driven by more units of chips being bought per customer.
+Let's have a look at this next.
+"""
+
+# look at quantity 
+
+```{r}
+data
+```
+
+```{r}
+units_by_LS <- aggregate(data$PROD_QTY, by = list(data$LIFESTAGE), sum)
+units_by_LS
+```
+```{r}
+
+ggplot(units_by_LS) + 
+  geom_bar(aes(x = Group.1, y = x), stat = "identity", width =.4, fill="brown1") +
+  coord_flip() + geom_text(aes(x = Group.1, y = x, label = x))
+  ylab("LifeStage") + xlab("Units") + scale_x_discrete(limits = Group.1) +
+  ggtitle("units bought by LifeStyle")
+```
+""
+
+Older families and young families in general buy more chips per customer
+
+"""
+```{r}
+sales_by_PC_LS
+```
+
+```{r}
+data
+```
+
+```{r}
+
+sales_by_PC_LS$PROD_QTY= data$PROD_QTY
+sales_by_PC_LS
+
+```
+```{r}
+sales_by_PC_LS$PRICE = sales_by_PC_LS$TOT_SALES/sales_by_PC_LS$PROD_QTY
+
+```
+
+
+```{r}
+sales_by_PC_LS
+```
+
+```{r}
+AveragePrice_by_PC_LS <- aggregate(sales_by_PC_LS$PRICE, by = list(sales_by_PC_LS$PC_LS), mean)
+
+```
+
+```{r}
+AveragePrice_by_PC_LS
+```
+
+
+# order avg price
+```{r}
+AveragePrice_by_PC_LS[order(AveragePrice_by_PC_LS$x, decreasing = TRUE), ]
+```
+
+
+"""
+
+Mainstream midage and young singles and couples are more willing to pay more per
+packet of chips compared to their budget and premium counterparts. 
+
+This may be due to premium shoppers being more likely to buy healthy snacks and when they buy
+chips, this is mainly for entertainment purposes rather than their own consumption.
+
+This is also supported by there being fewer premium midage and young singles and
+couples buying chips compared to their mainstream counterparts.
+
+"""
+
+```{r}
+# As the difference in average price per unit isn't large, we can check if this
+# difference is statistically different.
+```
+
+#### Perform an independent t-test between mainstream vs premium and budget midage
+#and
+#### young singles and couples
+
+```{r}
+
+colnames(sales_by_PC_LS)
+sort(unique(sales_by_PC_LS$LIFESTAGE))
+
+```
+
+```{r}
+hypotest_PC_LS <- sales_by_PC_LS[, c(4,6)]
+hypotest_PC_LS
+
+```
+
+```{r}
+sort(unique(sales_by_PC_LS$PC_LS))
+```
+
+
+```{r}
+ hypotest_PC_LS <- hypotest_PC_LS %>% filter(PC_LS %in% c("Mainstream MIDAGE SINGLES/COUPLES" ,"Mainstream YOUNG SINGLES/COUPLES", "Premium MIDAGE SINGLES/COUPLES", "Budget MIDAGE SINGLES/COUPLES","Premium YOUNG SINGLES/COUPLES", "Budget YOUNG SINGLES/COUPLES"))
+
+hypotest_PC_LS # filtered only the 6 segments needed to test hypothesis
+
+```
+
+
+#  filtered only the 6 segments needed to test hypothesis
+```{r}
+library(dplyr)    # for mutate(), %>%
+library(magrittr) # for %<>%
+```
+
+
+```{r}
+
+
+hypotest_PC_LS %<>%
+  mutate(test = case_when(
+    PC_LS %in% "Mainstream MIDAGE SINGLES/COUPLES" ~ "Mainstream",
+    PC_LS %in% "Mainstream YOUNG SINGLES/COUPLES" ~ "Mainstream",
+    PC_LS %in% "Premium MIDAGE SINGLES/COUPLES" ~ "PremiumBudget",
+    PC_LS %in% "Budget MIDAGE SINGLES/COUPLES" ~ "PremiumBudget",
+    PC_LS %in% "Premium YOUNG SINGLES/COUPLES" ~ "PremiumBudget",
+    PC_LS %in% "Budget YOUNG SINGLES/COUPLES" ~ "PremiumBudget",
+  ))
+```
+
+
+```{r}
+hypotest_PC_LS
+```
+
+
+```{r}
+# t-test mainstream (young & midage) VS premium and budget 
+
+# As the difference in average price per unit isn't large, we can check if this
+# difference is statistically different.
+# hypothesis is mean price difference (mu)  is 0
+
+t.test(hypotest_PC_LS$PRICE ~ hypotest_PC_LS$test, mu= 0, alt ="two.sided", conf = 0.95, var.equal =F, paired = F )
+
+```
+
+"""
+The t-test results in a p-value of 2.2e-16(very significant), 
+
+i.e. the unit price for 
+mainstream, young and mid-age singles and couples 
+
+[ARE ] significantly higher than that of 
+
+budget or premium, young and midage singles and couples.
+"""
+
+
+```{r}
+
+boxplot(hypotest_PC_LS$PRICE ~ hypotest_PC_LS$test)
+
+```
+
+
+
+## Deep dive into specific customer segments for insights
+
+"""
+We might want to target customer segments that contribute the most to sales
+to retain them or further increase sales.
+
+Let's look at Mainstream - young singles/couples.
+For instance, let's find out if they tend to buy a particular brand of chips.
+"""
+
+#### Deep dive into Mainstream, young singles/couples
+
+"""
+Check affinity analysis / apriori algorithm for:
+1. brand affinity
+2. pack size affinity
+"""
+
+
+
+```{r}
+
+#### Deep dive into Mainstream, young singles/couples
+segment1 <‐ data[LIFESTAGE == "YOUNG SINGLES/COUPLES" & PREMIUM_CUSTOMER == "Mainstream",]
+
+other <‐ data[!(LIFESTAGE == "YOUNG SINGLES/COUPLES" & PREMIUM_CUSTOMER ==
+ "Mainstream"),]
+
+
+```
+
+```{r}
+segment1
+```
+
+
+```{r}
+#### total quantities bought in target segment and others
+
+quantity_segment1 <‐ segment1[, sum(PROD_QTY)]
+quantity_segment1
+
+```
+```{r}
+quantity_other <‐ other[, sum(PROD_QTY)]
+
+
+```
+
+```{r}
+
+# brand affinity
+quantity_segment1_by_brand <‐ segment1[, .(targetSegment = sum(PROD_QTY)/quantity_segment1), by = BRAND_NAME]
+
+quantity_segment1_by_brand
+
+```
+
+```{r}
+quantity_other_by_brand <‐ other[, .(other = sum(PROD_QTY)/quantity_other), by = BRAND_NAME]
+
+quantity_other_by_brand
+```
+
+```{r}
+brand_proportions <‐ merge(quantity_segment1_by_brand, quantity_other_by_brand)[, affinityToBrand := targetSegment/other]
+
+
+```
+
+
+```{r}
+brand_proportions[order(-affinityToBrand)]
+```
+
+
+# High affinity towards Tyrell (target segment more likely to buy by 22.8%)
+
+
+ 
+
+```{r}
+ # affinity to pack size
+
+quantity_segment1_by_size <- segment1[, .(targetSegment = sum(PROD_QTY)/quantity_segment1), by = PACK_SIZE]
+
+quantity_other_by_size <- other[, .(other = sum(PROD_QTY)/quantity_other), by = PACK_SIZE]
+
+```
+
+```{r}
+size_Proportions <- merge(quantity_segment1_by_size, quantity_other_by_size)[, affinityToSize := targetSegment/other]
+
+```
+
+```{r}
+
+size_Proportions[order(-affinityToSize)]
+```
+
+
+# High affinity to pack size of 270g (target segment more likely to buy by 26.8%)
+
+# need to stock chips with pack size 270g
+#look at what products have a pack size of 270g
+
+```{r}
+
+data[PACK_SIZE == 270, unique(PROD_NAME)]
+
+
+```
+
+## Conclusion
+
+"""
+
+1. Sales have mainly been due to Budget - older families, Mainstream - young singles/couples, and Mainstream- retirees shoppers.
+
+2. We found that the high spend in chips for mainstream young singles/couples and retirees is due to there being more of them than other buyers. 
+
+3. Mainstream, midage and young singles and couples are also more likely to pay more per packet of chips. 
+
+This is indicative of impulse buying behaviour.
+
+4. We’ve also found that Mainstream young singles and couples are 23% more likely to purchase Tyrrells chips compared to the rest of the population.
+
+5. The Category Manager may want to increase the category’s performance by off-locating some Tyrrells and smaller packs of chips in discretionary space near segments
+where young singles and couples frequent more often to increase visibilty and impulse behaviour
+
+"""
