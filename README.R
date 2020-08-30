@@ -18,3 +18,4 @@ Use your analytics and insights from Task 1 and 2
 to prepare a report for your client, the Category Manager.
 
 "
+getwd()
