@@ -17,5 +17,5 @@ Task 3 : Analytics and commercial application
 Use your analytics and insights from Task 1 and 2 
 to prepare a report for your client, the Category Manager.
 
+Find the R markdown files for all 3 task also look at Powerpoint presentation (Quantiom.PPTX)
 "
-getwd()
