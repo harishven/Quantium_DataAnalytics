@@ -12,5 +12,5 @@ Customer Analytics
 Customer Segmentation
 Hypothesis Testing
 Affinity analysis
-Presentation through Pyramid Principle frameworks
+PowerPoint Presentation through Pyramid Principle frameworks
 
